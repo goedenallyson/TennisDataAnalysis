@@ -1,0 +1,370 @@
+---
+title: "Tennis Data Analysis"
+author: "Allyson Goeden"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# source the files needed for the project
+source("Libraries.R")
+source("Functions.R")
+```
+
+# Unraveling the Dynamics of Men’s ATP Tour: A Data-Driven Approach
+
+## Introduction
+This project is rooted in my lifelong passion for tennis, a sport that captivated me from the tender age of four and has continued to be a large part of my personal life. Tennis is a fascinating game, a complex interplay of numerous factors that can significantly influence match outcomes. These factors range from player-specific attributes such as handedness, physical fitness, and mental strength, to external elements like weather conditions, court type, and crowd energy. The intriguing interplay of these variables and their potential impact on match results forms the basis of this analysis.
+
+The analysis will explore the distribution of tournaments, players, and nationalities in the dataset. It will also examine the average age and height of the players, the percentage of right-handed versus left-handed players, and the distribution of matches across different court surfaces (clay, grass, hard), and indoor versus outdoor settings. Furthermore, it will investigate the average duration of three-set and five-set matches.
+
+In addition to these exploratory analyses, I also aim to examine complex inferential questions. This includes how the average match duration varies across different combinations of court surface and player handedness and winning percentages across different regions and court surfaces. 
+
+Through this analysis, I hope to uncover interesting patterns and insights that could contribute to a deeper understanding of the dynamics of tennis matches.
+
+## Data Collection
+This project involves the analysis of data from the 2022 Men’s Association of Tennis Professionals (ATP) tour. Two datasets, namely “ATP_tour_2022.xlsx” and “atp_matches_2022.csv”, were procured from an online betting site and Kaggle, a free open-source database, respectively. These datasets encompass information regarding the winner, loser, sets played, location, and surface of each match.
+
+Each of these datasets contained unique information that was not present in the other. Specifically, one dataset lacked serving statistics for both winners and losers, while the other did not include match duration. By merging these two datasets, I was able to compensate for the missing information in each, resulting in a more comprehensive and complete dataset for analysis. This approach was beneficial as it ensured the availability of the most detailed data possible.
+
+## Data Preparation 
+During the data cleaning process for this project, considerable attention was devoted to the standardization of tournament names, and the names of winners and losers. Given the possibility of the same set of players competing in different tournaments, it was important to ensure consistency across these three columns.
+
+The names of both winners and losers were formatted to adhere to the “Last F.” style. This process involved identifying and rectifying special cases where the standard formatting was not applicable. The uniformity in the formatting of player names across both datasets was a critical step in accurately matching the winners and losers in each match.
+
+In a similar vein, the tournament names were standardized by establishing a mapping for tournament names. This ensured that the tournament names in both datasets were consistent and accurately represented the same events.
+
+Upon achieving uniformity in the formatting of player and tournament names across both datasets, they were merged to form a comprehensive dataset named tennis_data.
+
+To evaluate individual player statistics and to find useful descriptive statistics, an additional dataframe was created called player_data. The main focus of this dataframe was to reduce metrics of success down to each individual player's level. 
+
+To investigate the influence of regional factors on success, a distinct dataframe, region_data, was established. This dataframe primarily aims to calculate winning percentages across different surfaces, accommodating multiple observations of individual players.
+```{r, warning=FALSE}
+source("Data_Cleaning.R")
+```
+
+
+## Exploratory Data Analysis
+
+### How many different tournaments are included in the current analysis?
+```{r}
+num_unique_tournaments <- tennis_data$tournament %>%
+  unique() %>%
+  length()
+
+# Construct the statement 
+print(paste("There are", num_unique_tournaments, " different tournaments in this dataset."))
+```
+
+### How many different players are included in the current analysis? 
+```{r}
+num_unique_names <- player_data$name %>%
+  unique() %>%
+  length()
+
+print(paste("There are", num_unique_names, "different players in this dataset."))
+```
+### How many distinct player nationalities are included in the current analysis?
+```{r}
+num_unique_nationalities <- player_data$nationality %>%
+  unique() %>%
+  length()
+
+# Construct the statement 
+print(paste("There are", num_unique_nationalities, "distinct player nationalities in this dataset."))
+```
+
+### What is the average age of players? 
+```{r}
+average_age <- mean(player_data$age, na.rm = TRUE)
+print(paste("The average age is", round(average_age, 2)))
+```
+
+### What is the age distribution of players?
+```{r}
+ggplot(player_data, aes(x = age)) +
+  geom_histogram(binwidth = 1, fill = "lightblue", color = "black") +
+  theme_minimal() +
+  labs(title = "Distribution of Player Ages", x = "Age", y = "Count")
+```
+
+### What is the average height of players? 
+```{r}
+average_height <- player_data$height %>%
+  mean(na.rm = TRUE) %>%
+  round(2)
+print(paste("", average_height, "cm is the average height of players in this dataset."))
+```
+
+### What is the height distribution of players? 
+```{r}
+ggplot(player_data, aes(x = height)) +
+  geom_histogram(binwidth = 1, fill = "lightblue", color = "black") +
+  theme_minimal() +
+  labs(title = "Distribution of Player Heights", x = "Height", y = "Count")
+```
+
+### What percentage of players are right or left handed?
+```{r}
+player_data %>%
+  mutate(handedness = recode(handedness, "R" = "Right Handed", "L" = "Left Handed", "U" = "Unknown")) %>%
+  count(handedness) %>%
+  mutate(percentage = round(n / sum(n) * 100, 2)) %>% 
+  ggplot(aes(x = handedness, y = percentage, fill = handedness)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Percentage of Each Handedness", x = "Handedness", y = "Percentage") +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), vjust = -0.5)
+```
+
+### What percentage of matches are played between lefties, rightes, or both?
+```{r}
+tennis_data %>%
+  count(match_handedness) %>%
+  mutate(percentage = round(n / sum(n) * 100, 2)) %>% 
+  ggplot(aes(x = match_handedness, y = percentage, fill = match_handedness)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Distribution of Match Handedness Combinations", 
+       x = "Handedness Combination", 
+       y = "Percentage of Matches",
+       color = "Handedness Combination",
+       fill = "Handedness Combination",
+       caption = "**NA values represent matches when a player's handedness was unknown") +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), vjust = -0.5)
+```
+
+### What percentage of matches were played on clay, hard courts, and grass? 
+```{r}
+tennis_data %>%
+  count(surface) %>%
+  mutate(percentage = round(n / sum(n) * 100, 2)) %>% 
+  ggplot(aes(x = surface, y = percentage, fill = surface)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Percentage of Matches Played on Each Court Surface", x = "Surface", y = "Percentage") +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), vjust = -0.5)
+```
+
+### What percentage of matches were played indoors and outdoors?
+```{r}
+tennis_data %>%
+  count(court) %>%
+  mutate(percentage = round(n / sum(n) * 100, 2)) %>% 
+  ggplot(aes(x = court, y = percentage, fill = court)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Percentage of Each Court Location", x = "Court Location", y = "Percentage") +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), vjust = -0.5)
+```
+
+### What is the average match duration for three set and five set matches?
+```{r}
+duration_three_sets <- tennis_data %>% 
+  filter(best_of == 3) %>% 
+  summarise(avg_minutes = mean(minutes, na.rm = TRUE))
+
+duration_five_sets <- tennis_data %>% 
+  filter(best_of == 5) %>% 
+  summarise(avg_minutes = mean(minutes, na.rm = TRUE))
+
+print(paste("The average duration of three-set matches is", round(duration_three_sets$avg_minutes, 2), "minutes"))
+
+print(paste("The average duration of five-set matches is", round(duration_five_sets$avg_minutes, 2), "minutes"))
+
+```
+
+### What is the match duration distribution for three set and five set matches? 
+```{r, warning=FALSE}
+tennis_data %>%
+  mutate(best_of = recode(best_of, `3` = "Three Set Matches", `5` = "Five Set Matches")) %>% 
+  ggplot(aes(x = minutes)) +
+  geom_histogram(binwidth = 5, fill = "lightblue", color = "black") +
+  facet_wrap(~best_of) +
+  theme_minimal() +
+  labs(title = "Distribution of Minutes Played for Each Type of Match", x = "Minutes", y = "Count")
+```
+
+## Data Analysis
+### What is the average match duration for each combination of court surface and handedness, specifically for matches that are three sets?
+
+To gain insights into the average duration of tennis matches across different categories, a comprehensive visualization was developed. This visualization evaluates the mean duration of matches on various court surfaces, considering the different combinations of player handedness. Given that the majority of season matches are played as best of three sets, and only Grand Slam Tournament matches are played as best of five sets, the analysis was intentionally limited to matches that were best of three sets. This decision was further influenced by the limited availability of data for five-set matches on clay and grass surfaces.
+
+The analysis yielded several noteworthy findings. The duration of matches on hard courts was found to be consistent, irrespective of the handedness combination of the players. In contrast, the duration of matches on clay and grass surfaces appeared to be significantly influenced by player handedness.
+
+In particular, matches on clay and grass surfaces involving two left-handed players were observed to have the longest average duration. On the other hand, matches involving a right-left combination on grass recorded the shortest average duration. Interestingly, matches with a right-left combination on clay still had the second longest average duration.
+
+A key takeaway from this analysis is the potential impact of player handedness on match duration, particularly on grass and clay surfaces. Left-handed players, in particular, should anticipate longer matches on these surfaces and should accordingly prepare their fitness levels to meet these demands. This insight is particularly relevant for matches limited to three sets, as per the scope of this analysis. 
+
+```{r, message=FALSE, warning=FALSE}
+tennis_data %>%
+  filter(best_of != 5) %>%
+  group_by(surface, match_handedness) %>%
+  summarise(average_minutes = mean(minutes, na.rm = TRUE)) %>%
+  na.omit() %>% 
+  ggplot(aes(x = surface, y = average_minutes, color = match_handedness, group = match_handedness)) +
+  geom_point(size = 3) +
+  geom_line(size = 1.5) +
+  labs(x = "Surface",
+       y = "Match Duration (Minutes)", 
+       color = "Match Handedness Combinations",
+       title = "Average Match Duration Across Different Court Surfaces",
+       caption = "**Filtered to only include 3 set matches") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1 ))
+```
+
+### Are there statistically significant differences in the match duration across different court surfaces, handedness combinations, and their interaction, while controlling for the number of sets?
+
+To answer the above question, I conducted a 3X3 ANCOVA to determine if court surfaces, match handedness combinations, and their interaction were statistically significant, while controlling for the number of sets needed to win the match. This revealed a statistically significant results for court surface F(2,1302) = 14.88, p < .05. However, match handedness nor the interaction effect were significant, p > .05 respectively.
+
+
+```{r}
+mod1 <- aov(minutes ~ surface*match_handedness + best_of, data = tennis_data)
+summary(mod1)
+```
+
+```{r}
+tennis_data %>%
+  mutate(surface = factor(surface, levels = c("Clay", "Grass", "Hard"))) %>%
+  group_by(surface) %>%
+  summarise(average_minutes = mean(minutes, na.rm = TRUE)) %>% 
+  ggplot(aes(x = surface, y = average_minutes)) +
+  geom_point(size = 3) +
+  geom_line(group = 1, size = 1.5) +
+  labs(x = "Surface",
+       y = "Match Duration (Minutes)",
+       title = "Main Effect of Surface on Match Duration") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1 ))
+
+```
+
+In an effort to understand the discrepancy between the visual and statistical results of the interaction effect, I scrutinized my dataset. I found a shortage of data for matches involving left-handed players on all surfaces. This data scarcity can reduce the power of the statistical test and impact the normality assumption. More data is needed to accurately determine the existence and extent of the match handedness effect and its interaction with court surface. 
+
+```{r}
+# Create the table
+table_data <- addmargins(table(tennis_data$surface, tennis_data$match_handedness))
+
+# Print the table
+pander(table_data)
+```
+
+### What is the average winning percentage for each combination of court surface and region of origin?
+In an endeavor to understand the winning percentages across various categories, a detailed visualization was constructed. This visualization examines the average winning percentage across multiple global regions, taking into account the different court surfaces.
+
+The analysis led to several significant observations. Across all global regions, the average winning percentage was found to be highest for hard courts. This trend is likely attributable to the substantial number of matches played on hard courts during the 2022 ATP season.
+
+Interestingly, the United States exhibited some of the highest average winning percentages on hard courts. However, in stark contrast, it also had some of the lowest winning percentages on clay courts. This dichotomy suggests that a player's region of origin might influence their performance on different court surfaces.
+
+```{r}
+# Calculate the average win rate for each surface
+surface_data <- region_data %>%
+  mutate(region = factor(region, levels = unique(region))) %>%
+  group_by(region) %>%
+  summarise(
+    Hard = mean(win_rate_per_hard, na.rm = TRUE),
+    Clay = mean(win_rate_per_clay, na.rm = TRUE),
+    Grass = mean(win_rate_per_grass, na.rm = TRUE)
+  )
+
+# Reshape the data to long format
+surface_data_long <- surface_data %>%
+  gather(key = "surface", value = "avg_win_rate", -region)
+
+# Create a line plot with color mapped to surface
+ggplot(surface_data_long, aes(x = region, y = avg_win_rate, color = surface, group = surface)) +
+  geom_point(size = 3) + 
+  geom_line(size = 1.5) +
+  labs(x = "Region of Origin", 
+       y = "Winning Percentage", 
+       color = "Surface",
+       title = "Win Percentage, Region, and Surface",
+       caption = "**Note: Individual points reflect averages of the win percentages by surface for each individual region") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1 ))
+```
+
+### Are there statistically significant differences in winning percentages across different regions, court surfaces, and their interaction? 
+To answer the above question, I conducted a 3X8 ANOVA to determine if court surfaces, match handedness combinations, and their interaction were statistically significant. This revealed a statistically significant results for region F(7,2547) = 34.53, p < .05. However, surface nor the interaction effect were significant, p > .01 respectively. 
+```{r}
+mod2 <- aov(total_won_per ~ surface*region, data = region_data)
+summary(mod2)
+```
+
+```{r}
+region_data %>%
+  group_by(region) %>%
+  summarise(avg_win_rate = mean(c(win_rate_per_hard, win_rate_per_clay, win_rate_per_grass), na.rm = TRUE)) %>% 
+  ggplot(aes(x = region, y = avg_win_rate)) +
+  geom_point(size = 3) + 
+  geom_line(size = 1.5, group = 1) +
+  labs(x = "Region of Origin", 
+       y = "Average Winning Percentage", 
+       title = "Main Effect of Region on Winning Percentage") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1 ))
+```
+
+In an effort to understand the discrepancy between the visual and statistical results of the interaction effect, I scrutinized my dataset. I found a shortage of data for matches involving African, Asian, North American, and players in the Other category across all surfaces. This data scarcity can reduce the power of the statistical test and impact the normality assumption. More data is needed to accurately determine the existence and extent of the regional effect and its interaction with court surface. 
+
+```{r}
+# Create the table
+table_data <- addmargins(table(region_data$region, region_data$surface))
+
+# Print the table
+pander(table_data)
+```
+
+## Conclusion
+In summary, this analysis has shed light on some intricate relationships that might exist between a player’s individual characteristics and match factors such as the type of court surface and the opponent’s handedness. It is crucial to acknowledge that, despite their visual significance, these findings demonstrated minimal statistical impact when incorporated into an ANOVA model framework. Future studies should strive to explore these issues on a broader scale with a larger dataset, or devise methods to manage sparse data, in order to overcome the observed lack of statistical power in this analysis.
+
+## Data Sources
+http://www.tennis-data.co.uk/alldata.php
+
+https://www.kaggle.com/datasets/guillemservera/tennis
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
